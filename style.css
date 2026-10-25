@@ -203,6 +203,22 @@ body {
   opacity: 0.95;
 }
 
+.mobile-file-tip {
+  margin: 20px auto 0;
+  max-width: 580px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(6, 182, 212, 0.1);
+  border: 1px solid rgba(6, 182, 212, 0.3);
+  color: #cbd5e1;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.mobile-file-tip strong {
+  color: #38bdf8;
+}
+
 /* Track Bar */
 .track-bar {
   display: flex;

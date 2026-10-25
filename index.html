@@ -30,7 +30,8 @@
 
     <!-- 1. 업로드 영역 -->
     <section class="upload-section" id="uploadSection">
-      <input type="file" id="fileInput" accept="audio/mp3,audio/mpeg,audio/wav,audio/ogg,audio/m4a,audio/*" hidden />
+      <!-- accept 속성을 제거하면 안드로이드에서 사진/앨범 창이 아닌 '내 파일 / 다운로드 폴더' 전체 탐색기가 바로 열립니다 -->
+      <input type="file" id="fileInput" hidden />
       <div class="drop-zone" id="dropZone">
         <div class="drop-icon">
           <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -39,9 +40,12 @@
             <line x1="12" y1="3" x2="12" y2="15"></line>
           </svg>
         </div>
-        <h2>MP3 파일을 여기에 끌어다 놓거나 클릭하여 선택하세요</h2>
+        <h2>MP3 파일을 여기에 끌어다 놓거나 터치하여 선택하세요</h2>
         <p>MP3, WAV, M4A 등 모든 오디오 파일 지원 · 서버 전송 없이 브라우저에서 즉시 처리</p>
-        <button type="button" class="btn-primary-outline" id="selectFileBtn">파일 찾아보기</button>
+        <button type="button" class="btn-primary-outline" id="selectFileBtn">내 파일 / 다운로드 폴더에서 찾기</button>
+        <div class="mobile-file-tip">
+          <strong>📱 스마트폰에서 MP3 찾는 법:</strong> 버튼 터치 후 <strong>[내 파일]</strong> 또는 왼쪽 위 <strong>[≡ 메뉴] → [다운로드(Downloads)] / [오디오]</strong>를 누르면 저장된 MP3가 바로 보입니다!
+        </div>
       </div>
     </section>
 

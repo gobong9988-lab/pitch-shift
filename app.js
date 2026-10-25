@@ -211,6 +211,44 @@
     exportSummaryText.textContent = `${signStr}키${centsPart} · ${info.shortInt} · 속도 ${tempoPct}%`;
   }
 
+  // iOS Safari 호환성을 위한 FileReader 기반 ArrayBuffer 읽기
+  function readFileAsArrayBuffer(file) {
+    if (typeof file.arrayBuffer === 'function') {
+      return file.arrayBuffer().catch(() => {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => reject(reader.error);
+          reader.readAsArrayBuffer(file);
+        });
+      });
+    }
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  // iOS Safari (구버전 및 WebKit) 호환성을 위한 decodeAudioData 래퍼
+  function decodeAudioDataCompat(ctx, arrayBuffer) {
+    return new Promise((resolve, reject) => {
+      try {
+        const res = ctx.decodeAudioData(
+          arrayBuffer,
+          (decoded) => resolve(decoded),
+          (err) => reject(err || new Error('오디오 디코딩 실패'))
+        );
+        if (res && typeof res.catch === 'function') {
+          res.catch((err) => reject(err));
+        }
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
   // 오디오 파일 로드 및 디코딩
   async function handleFile(file) {
     if (!file) return;
@@ -224,12 +262,15 @@
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
         audioCtx = new AudioContextClass();
       }
+      // 주의: iOS Safari에서는 파일 선택(change) 이벤트 중 audioCtx.resume()을 await하면
+      // 사용자 직접 터치 제스처로 인정하지 않아 영구 대기(Hang) 상태에 빠집니다.
+      // 따라서 여기서는 await 없이 비동기로만 호출하고, 실제 resume은 재생 버튼 터치 시 수행합니다.
       if (audioCtx.state === 'suspended') {
-        await audioCtx.resume();
+        audioCtx.resume().catch(() => {});
       }
 
-      const arrayBuffer = await file.arrayBuffer();
-      audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+      const arrayBuffer = await readFileAsArrayBuffer(file);
+      audioBuffer = await decodeAudioDataCompat(audioCtx, arrayBuffer);
 
       // UI 전환
       uploadSection.classList.add('hidden');
@@ -341,8 +382,16 @@
 
   async function togglePlayback() {
     if (!audioBuffer) return;
-    if (audioCtx && audioCtx.state === 'suspended') {
-      await audioCtx.resume();
+    if (audioCtx && audioCtx.state !== 'running') {
+      try {
+        await audioCtx.resume();
+        // iOS Safari 오디오 잠금 해제용 무음 버퍼 재생
+        const silentBuf = audioCtx.createBuffer(1, 1, 22050);
+        const src = audioCtx.createBufferSource();
+        src.buffer = silentBuf;
+        src.connect(audioCtx.destination);
+        src.start(0);
+      } catch (_) {}
     }
 
     if (isPlaying) {
@@ -625,18 +674,39 @@
   }
 
   // Event Listeners
+  function ensureAudioContextUnlocked() {
+    if (!audioCtx) {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (AudioContextClass) {
+        audioCtx = new AudioContextClass();
+      }
+    }
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(() => {});
+    }
+  }
+
   selectFileBtn.addEventListener('click', (e) => {
     e.stopPropagation();
+    ensureAudioContextUnlocked();
     fileInput.click();
   });
 
-  dropZone.addEventListener('click', () => fileInput.click());
+  dropZone.addEventListener('click', () => {
+    ensureAudioContextUnlocked();
+    fileInput.click();
+  });
 
-  changeFileBtn.addEventListener('click', () => fileInput.click());
+  changeFileBtn.addEventListener('click', () => {
+    ensureAudioContextUnlocked();
+    fileInput.click();
+  });
 
   fileInput.addEventListener('change', (e) => {
     if (e.target.files && e.target.files[0]) {
       handleFile(e.target.files[0]);
+      // 동일한 파일을 다시 선택할 수 있도록 초기화
+      e.target.value = '';
     }
   });
 
