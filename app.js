@@ -93,6 +93,7 @@
   let simpleFilter = null;
   let scriptNode = null;
   let gainNode = null;
+  let keepAliveSource = null;
 
   let isPlaying = false;
   let isBypass = false;
@@ -101,6 +102,15 @@
   let currentTempo = 1.0;
 
   const BUFFER_SIZE = 4096;
+
+  // iOS 무음 스위치(진동 모드)가 켜져 있어도 미디어 스피커로 소리가 나오도록 설정
+  function configureIOSAudioSession() {
+    try {
+      if (navigator.audioSession && navigator.audioSession.type !== 'playback') {
+        navigator.audioSession.type = 'playback';
+      }
+    } catch (_) {}
+  }
 
   // 초기 UI 구성 (건반 및 슬라이더 눈금 생성)
   function initControlsUI() {
@@ -317,6 +327,17 @@
     scriptNode = audioCtx.createScriptProcessor(BUFFER_SIZE, 2, 2);
     const samples = new Float32Array(BUFFER_SIZE * 2);
 
+    // iOS Safari(WebKit) 필수 처리: ScriptProcessorNode에 연결된 입력 소스가 없으면
+    // 오디오 그래프가 활성화되지 않거나 소리가 출력되지 않는 버그를 방지하기 위해 무음 루프 소스를 연결합니다.
+    try {
+      const dummyBuf = audioCtx.createBuffer(2, BUFFER_SIZE, audioCtx.sampleRate);
+      keepAliveSource = audioCtx.createBufferSource();
+      keepAliveSource.buffer = dummyBuf;
+      keepAliveSource.loop = true;
+      keepAliveSource.connect(scriptNode);
+      keepAliveSource.start(0);
+    } catch (_) {}
+
     scriptNode.onaudioprocess = (e) => {
       const outL = e.outputBuffer.getChannelData(0);
       const outR = e.outputBuffer.getChannelData(1);
@@ -365,6 +386,13 @@
   }
 
   function disconnectAudioNodes() {
+    if (keepAliveSource) {
+      try {
+        keepAliveSource.stop();
+        keepAliveSource.disconnect();
+      } catch (_) {}
+      keepAliveSource = null;
+    }
     if (scriptNode) {
       try {
         scriptNode.onaudioprocess = null;
@@ -382,17 +410,24 @@
 
   async function togglePlayback() {
     if (!audioBuffer) return;
-    if (audioCtx && audioCtx.state !== 'running') {
-      try {
-        await audioCtx.resume();
-        // iOS Safari 오디오 잠금 해제용 무음 버퍼 재생
-        const silentBuf = audioCtx.createBuffer(1, 1, 22050);
-        const src = audioCtx.createBufferSource();
-        src.buffer = silentBuf;
-        src.connect(audioCtx.destination);
-        src.start(0);
-      } catch (_) {}
+
+    configureIOSAudioSession();
+
+    if (!audioCtx) {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new AudioContextClass();
     }
+
+    // iOS Safari에서는 터치 이벤트 핸들러 내부에서 동기적으로 resume()과 무음 버퍼 start(0)를 호출해야 잠금이 풀립니다.
+    try {
+      const resumePromise = audioCtx.resume();
+      const silentBuf = audioCtx.createBuffer(1, 1, audioCtx.sampleRate || 44100);
+      const src = audioCtx.createBufferSource();
+      src.buffer = silentBuf;
+      src.connect(audioCtx.destination);
+      src.start(0);
+      await resumePromise;
+    } catch (_) {}
 
     if (isPlaying) {
       isPlaying = false;
@@ -401,12 +436,12 @@
       statusBadge.textContent = '일시정지됨';
     } else {
       // 끝에 도달했으면 처음으로
-      if (simpleFilter && simpleFilter.sourcePosition >= audioBuffer.length - BUFFER_SIZE) {
-        simpleFilter.sourcePosition = 0;
-      }
-      if (!scriptNode) {
-        setupSoundTouchPipeline(simpleFilter ? simpleFilter.sourcePosition : 0);
-      }
+      const currentPos = simpleFilter ? simpleFilter.sourcePosition : 0;
+      const startPos = currentPos >= audioBuffer.length - BUFFER_SIZE ? 0 : currentPos;
+
+      // 오디오 컨텍스트가 깨어난 상태에서 파이프라인을 재연결하여 iOS에서도 확실히 소리 출력
+      setupSoundTouchPipeline(startPos);
+
       isPlaying = true;
       playIcon.classList.add('hidden');
       pauseIcon.classList.remove('hidden');
@@ -675,14 +710,22 @@
 
   // Event Listeners
   function ensureAudioContextUnlocked() {
+    configureIOSAudioSession();
     if (!audioCtx) {
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
       if (AudioContextClass) {
         audioCtx = new AudioContextClass();
       }
     }
-    if (audioCtx && audioCtx.state === 'suspended') {
-      audioCtx.resume().catch(() => {});
+    if (audioCtx && audioCtx.state !== 'running') {
+      try {
+        audioCtx.resume().catch(() => {});
+        const silentBuf = audioCtx.createBuffer(1, 1, audioCtx.sampleRate || 44100);
+        const src = audioCtx.createBufferSource();
+        src.buffer = silentBuf;
+        src.connect(audioCtx.destination);
+        src.start(0);
+      } catch (_) {}
     }
   }
 
