@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>피치 시프트 (Pitch Shifter Studio)</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
+
+  <main class="studio-container">
+    <header class="studio-header">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 18V5l12-2v13"></path>
+            <circle cx="6" cy="18" r="3"></circle>
+            <circle cx="18" cy="16" r="3"></circle>
+          </svg>
+        </div>
+        <div>
+          <h1>피치 시프트 <span class="badge">PRO</span></h1>
+          <p class="subtitle">템포 변화 없이 MP3의 키(스케일)를 자유롭게 조절하세요</p>
+        </div>
+      </div>
+      <div class="header-status" id="statusBadge">오디오 파일 대기 중</div>
+    </header>
+
+    <!-- 1. 업로드 영역 -->
+    <section class="upload-section" id="uploadSection">
+      <input type="file" id="fileInput" accept="audio/mp3,audio/mpeg,audio/wav,audio/ogg,audio/m4a,audio/*" hidden />
+      <div class="drop-zone" id="dropZone">
+        <div class="drop-icon">
+          <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" y1="3" x2="12" y2="15"></line>
+          </svg>
+        </div>
+        <h2>MP3 파일을 여기에 끌어다 놓거나 클릭하여 선택하세요</h2>
+        <p>MP3, WAV, M4A 등 모든 오디오 파일 지원 · 서버 전송 없이 브라우저에서 즉시 처리</p>
+        <button type="button" class="btn-primary-outline" id="selectFileBtn">파일 찾아보기</button>
+      </div>
+    </section>
+
+    <!-- 파일 로드 후 표시되는 컨트롤 스튜디오 -->
+    <section class="workspace-section hidden" id="workspaceSection">
+      <!-- 상단 트랙 바 -->
+      <div class="track-bar">
+        <div class="track-info">
+          <span class="file-tag">TRACK</span>
+          <span class="file-name" id="fileNameDisplay">sample.mp3</span>
+          <span class="file-meta" id="fileMetaDisplay">44.1kHz · Stereo</span>
+        </div>
+        <button type="button" class="btn-change-file" id="changeFileBtn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" y1="3" x2="12" y2="15"></line>
+          </svg>
+          다른 곡 불러오기
+        </button>
+      </div>
+
+      <!-- 파형 및 플레이어 -->
+      <div class="player-card">
+        <div class="waveform-wrapper" id="waveformWrapper" title="클릭하여 재생 위치 이동">
+          <canvas id="waveformCanvas"></canvas>
+          <div class="playhead" id="playhead"></div>
+          <div class="hover-time" id="hoverTime">0:00</div>
+        </div>
+
+        <div class="player-controls">
+          <div class="transport-group">
+            <button type="button" class="btn-play" id="playPauseBtn" title="재생 / 일시정지 (Space)">
+              <svg id="playIcon" width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="6 4 20 12 6 20 6 4"></polygon>
+              </svg>
+              <svg id="pauseIcon" class="hidden" width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="6" y="4" width="4" height="16" rx="1"></rect>
+                <rect x="14" y="4" width="4" height="16" rx="1"></rect>
+              </svg>
+            </button>
+            <button type="button" class="btn-icon" id="stopBtn" title="처음으로">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="19 20 9 12 19 4 19 20"></polygon>
+                <line x1="5" y1="19" x2="5" y2="5"></line>
+              </svg>
+            </button>
+            <div class="time-readout">
+              <span id="currentTime">0:00</span>
+              <span class="time-sep">/</span>
+              <span id="totalDuration">0:00</span>
+            </div>
+          </div>
+
+          <div class="compare-group">
+            <button type="button" class="btn-bypass" id="bypassBtn" title="누르고 있거나 클릭하여 원곡 키와 비교">
+              <span class="dot"></span>
+              원곡 키 비교 (Bypass)
+            </button>
+            <div class="volume-control">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+              </svg>
+              <input type="range" id="volumeSlider" min="0" max="1.2" step="0.01" value="1" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 핵심: 피치 시프트 & 큐베이스 스타일 건반 컨트롤 -->
+      <div class="pitch-deck">
+        <!-- 현재 키 상태 전광판 -->
+        <div class="pitch-monitor">
+          <div class="monitor-box primary">
+            <span class="monitor-label">SEMITONES (반음 조절)</span>
+            <div class="semi-stepper">
+              <button type="button" class="step-btn" id="semiDownBtn" title="반음 내리기 (-1)">−</button>
+              <span class="monitor-value" id="semitoneValue">0</span>
+              <button type="button" class="step-btn" id="semiUpBtn" title="반음 올리기 (+1)">+</button>
+            </div>
+            <span class="monitor-sub" id="keyRelationText">원곡 키 그대로 (Original Key)</span>
+          </div>
+
+          <div class="monitor-box">
+            <span class="monitor-label">기준 C 대비 스케일 & 음정</span>
+            <div class="interval-display">
+              <span class="note-badge" id="currentNoteBadge">C4</span>
+              <span class="interval-name" id="intervalNameDisplay">완전 1도 (원키)</span>
+            </div>
+            <span class="monitor-sub" id="genderGuideText">남녀 기본 원곡 스케일</span>
+          </div>
+
+          <div class="monitor-box fine-box">
+            <div class="fine-header">
+              <span class="monitor-label">미세 튜닝 / 템포</span>
+              <button type="button" class="btn-text-reset" id="resetAllBtn">전체 초기화</button>
+            </div>
+            <div class="mini-sliders">
+              <div class="mini-slider-row">
+                <label for="centsSlider">미세 음정</label>
+                <input type="range" id="centsSlider" min="-50" max="50" step="1" value="0" />
+                <span id="centsValue">0 ct</span>
+              </div>
+              <div class="mini-slider-row">
+                <label for="tempoSlider">재생 속도</label>
+                <input type="range" id="tempoSlider" min="0.70" max="1.30" step="0.01" value="1.00" />
+                <span id="tempoValue">100%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 원클릭 프리셋 버튼 (남자키/여자키 & 반음 퀵버튼) -->
+        <div class="presets-bar">
+          <div class="preset-group">
+            <span class="preset-title">원클릭 성별/음역 변환</span>
+            <div class="preset-pills">
+              <button type="button" class="preset-pill" data-semi="-5" title="여자 노래를 남자가 부르기 편한 키 (-5키, 완전4도 낮춤)">
+                <span class="pill-tag">여자곡 → 남자키</span>
+                <strong>-5 키 (완전4도 ↓)</strong>
+              </button>
+              <button type="button" class="preset-pill" data-semi="-4" title="여자 노래를 남자가 부를 때 (-4키, 장3도 낮춤)">
+                <span class="pill-tag">여자곡 → 남자키</span>
+                <strong>-4 키 (장3도 ↓)</strong>
+              </button>
+              <button type="button" class="preset-pill" data-semi="-2" title="고음이 부담스러울 때 온음(장2도) 낮춤">
+                <span class="pill-tag">고음 완화</span>
+                <strong>-2 키 (장2도 ↓)</strong>
+              </button>
+              <button type="button" class="preset-pill active" data-semi="0">
+                <span class="pill-tag">기본</span>
+                <strong>0 원곡 키</strong>
+              </button>
+              <button type="button" class="preset-pill" data-semi="2" title="노래가 너무 낮을 때 온음(장2도) 올림">
+                <span class="pill-tag">텐션 업</span>
+                <strong>+2 키 (장2도 ↑)</strong>
+              </button>
+              <button type="button" class="preset-pill" data-semi="4" title="남자 노래를 여자가 부를 때 (+4키, 장3도 올림)">
+                <span class="pill-tag">남자곡 → 여자키</span>
+                <strong>+4 키 (장3도 ↑)</strong>
+              </button>
+              <button type="button" class="preset-pill" data-semi="5" title="남자 노래를 여자가 부르기 편한 키 (+5키, 완전4도 올림)">
+                <span class="pill-tag">남자곡 → 여자키</span>
+                <strong>+5 키 (완전4도 ↑)</strong>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 슬라이더 바 (-12 ~ +12) -->
+        <div class="semitone-slider-wrap">
+          <div class="slider-labels">
+            <span>-12 (한 옥타브 낮춤)</span>
+            <span>0 (원곡 기준 C)</span>
+            <span>+12 (한 옥타브 올림)</span>
+          </div>
+          <input type="range" id="semitoneSlider" min="-12" max="12" step="1" value="0" />
+          <div class="slider-ticks" id="sliderTicks"></div>
+        </div>
+
+        <!-- 큐베이스 스타일 건반 (원곡을 가운데 C로 두고 장3도, 단2도 등 직관적 선택) -->
+        <div class="piano-section">
+          <div class="piano-header">
+            <div>
+              <h3>큐베이스 스타일 스케일 건반 <span class="hint-pill">원곡 키 = 가운데 C (0)</span></h3>
+              <p>어떤 노래든 원곡을 <strong>가운데 C(도)</strong>로 기준 잡고, 원하는 음정(단2도, 장3도, 완전4도 등)의 건반을 눌러 바로 키를 바꾸세요.</p>
+            </div>
+          </div>
+          <div class="piano-scroll-container">
+            <div class="piano-keyboard" id="pianoKeyboard">
+              <!-- JS에서 -12 ~ +12 건반 자동 생성 -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. 변환 파일 저장/다운로드 영역 -->
+      <div class="export-card">
+        <div class="export-info">
+          <h3>바뀐 키로 음원 다운로드</h3>
+          <p>현재 설정된 키(<strong id="exportSummaryText">0키, 속도 100%</strong>)가 적용된 새 파일로 저장합니다.</p>
+        </div>
+        <div class="export-actions">
+          <button type="button" class="btn-export-mp3" id="exportMp3Btn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            MP3로 저장하기 (권장)
+          </button>
+          <button type="button" class="btn-export-wav" id="exportWavBtn">
+            무손실 WAV 저장
+          </button>
+        </div>
+      </div>
+
+      <!-- 렌더링 진행 모달/바 -->
+      <div class="progress-overlay hidden" id="progressOverlay">
+        <div class="progress-box">
+          <div class="spinner"></div>
+          <h4 id="progressTitle">키 변환 및 MP3 인코딩 중...</h4>
+          <p id="progressSub">잠시만 기다려주세요 (브라우저에서 고속 처리 중)</p>
+          <div class="progress-bar-track">
+            <div class="progress-bar-fill" id="progressBarFill"></div>
+          </div>
+          <span class="progress-percent" id="progressPercent">0%</span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="lib/soundtouch.min.js"></script>
+  <script src="lib/lame.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
